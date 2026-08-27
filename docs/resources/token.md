@@ -37,6 +37,8 @@ resource "authentik_token" "default" {
 
 ### Optional
 
+> **NOTE**: [Write-only arguments](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments) are supported in Terraform 1.11 and later.
+
 - `description` (String)
 - `expires` (String)
 - `expiring` (Boolean) Defaults to `true`.
@@ -46,6 +48,8 @@ resource "authentik_token" "default" {
   - `recovery`
   - `app_password`
  Defaults to `api`.
+- `key_wo` (String, Sensitive, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) Token key to set without storing it in plan or state. Use key_wo_version to trigger updates.
+- `key_wo_version` (Number) Change this value to update key_wo.
 - `retrieve_key` (Boolean) Defaults to `false`.
 
 ### Read-Only

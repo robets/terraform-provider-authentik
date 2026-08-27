@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/hashicorp/go-cty/cty"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	api "goauthentik.io/api/v3"
@@ -21,6 +22,19 @@ func resourceToken() *schema.Resource {
 			StateContext: schema.ImportStatePassthroughContext,
 		},
 		Schema: map[string]*schema.Schema{
+			// Write-only
+			"key_wo": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Sensitive:   true,
+				WriteOnly:   true,
+				Description: "Token key to set without storing it in plan or state. Use key_wo_version to trigger updates.",
+			},
+			"key_wo_version": {
+				Type:        schema.TypeInt,
+				Optional:    true,
+				Description: "Change this value to update key_wo.",
+			},
 			// Computed
 			"key": {
 				Type:      schema.TypeString,
@@ -90,6 +104,26 @@ func resourceTokenSchemaToModel(d *schema.ResourceData) (*api.TokenRequest, diag
 	return &m, nil
 }
 
+func resourceTokenSetConfiguredKey(ctx context.Context, d *schema.ResourceData, c *APIClient) diag.Diagnostics {
+	key, diags := d.GetRawConfigAt(cty.GetAttrPath("key_wo"))
+	if diags.HasError() || key.IsNull() {
+		return diags
+	}
+	if !key.IsKnown() || !key.Type().Equals(cty.String) {
+		return diag.Errorf("error retrieving write-only argument: key_wo is not a known string")
+	}
+	return resourceTokenSetKey(ctx, d, c, key.AsString())
+}
+
+func resourceTokenSetKey(ctx context.Context, d *schema.ResourceData, c *APIClient, key string) diag.Diagnostics {
+	hr, err := c.client.CoreAPI.CoreTokensSetKeyCreate(ctx, d.Id()).
+		TokenSetKeyRequest(*api.NewTokenSetKeyRequest(key)).Execute()
+	if err != nil {
+		return helpers.HTTPToDiag(d, hr, err)
+	}
+	return nil
+}
+
 func resourceTokenCreate(ctx context.Context, d *schema.ResourceData, m any) diag.Diagnostics {
 	c := m.(*APIClient)
 
@@ -104,6 +138,10 @@ func resourceTokenCreate(ctx context.Context, d *schema.ResourceData, m any) dia
 	}
 
 	d.SetId(res.Identifier)
+	diags = resourceTokenSetConfiguredKey(ctx, d, c)
+	if diags.HasError() {
+		return diags
+	}
 	return resourceTokenRead(ctx, d, m)
 }
 
@@ -146,6 +184,12 @@ func resourceTokenUpdate(ctx context.Context, d *schema.ResourceData, m any) dia
 	}
 
 	d.SetId(res.Identifier)
+	if d.HasChange("key_wo_version") {
+		diags := resourceTokenSetConfiguredKey(ctx, d, c)
+		if diags.HasError() {
+			return diags
+		}
+	}
 	return resourceTokenRead(ctx, d, m)
 }
 
