@@ -135,6 +135,7 @@ func Provider(version string, testing bool) *schema.Provider {
 			"authentik_request_rule_binding":              tr(resourceRequestRuleBinding),
 			"authentik_request_rule_child_binding":        tr(resourceRequestRuleChildBinding),
 			"authentik_service_connection_docker":         tr(resourceServiceConnectionDocker),
+			"authentik_service_account":                   tr(resourceServiceAccount),
 			"authentik_service_connection_kubernetes":     tr(resourceServiceConnectionKubernetes),
 			"authentik_source_kerberos":                   tr(resourceSourceKerberos),
 			"authentik_source_ldap":                       tr(resourceSourceLDAP),
@@ -227,7 +228,9 @@ func providerConfigure(version string, testing bool) schema.ConfigureContextFunc
 		}
 
 		config := api.NewConfiguration()
-		config.Debug = true
+		// The generated client includes request and response bodies in debug dumps.
+		// Keep it disabled because multiple authentik endpoints carry credentials.
+		config.Debug = false
 		config.UserAgent = fmt.Sprintf("authentik-terraform@%s", version)
 
 		// Construct full server URL including path component and /api/v3 suffix
